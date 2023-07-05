@@ -35,8 +35,8 @@ custom_dictionary_trie = Trie(words)
 # Function that processes the user input
 def cut_msg(txt):
     txt = normalize(txt)
-    txt = re.sub(r'\(.*?\)', lambda x: ''.join(x.group(0).split()), txt) # เอา space ทั้งหมดออก
-    txt = re.sub(r"[^\S]?(\(.*?\))[^\S]?", r" \1 ",txt) # เพิ่ม space ก่อนและหลังวงเล็บ
+    txt = re.sub(r'\(.*?\)', lambda x: ''.join(x.group(0).split()), txt) 
+    txt = re.sub(r"[^\S]?(\(.*?\))[^\S]?", r" \1 ",txt) 
     space_cut = re.split("\s", txt)
     clean_list = space_cut.copy()
     adj = []
