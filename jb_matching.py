@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_option_menu import option_menu
 import boto3
 import io
 import os
@@ -209,16 +210,16 @@ def name_pred(txt):
 # Page for single product matching
 def product_matching_page():
 
-    # Clear session state if clear cache button is clicked
-    if st.button("Clear Cache"):
-        st.session_state.clear()
-
     st.title("Product Matching")
     product_name = st.text_input("Enter the product name")
 
     if st.button("Match"):
         matched_product = name_pred(product_name)
         st.session_state.matched_product = matched_product
+
+    # Clear session state if clear cache button is clicked
+    if st.button("Clear"):
+        st.session_state.clear()
 
     if "matched_product" in st.session_state:
         matched_product = st.session_state.matched_product
@@ -326,14 +327,16 @@ def file_product_matching_page():
                     mime="text/csv"
                 )
 
-# Main function to run the app
-def main():
-    page = st.sidebar.selectbox("Go to", ("Single Product Matching", "File Product Matching"))
+selected = option_menu(
+    menu_title = 'Jenbunjerd product matching',
+    options = ['Single product matching', 'File product matching'],
+    default_index = 0,
+    icons = ['1-circle', 'file-excel'],
+    menu_icon = 'card-list',
+    orientation = 'horizontal'
+    )
 
-    if page == "Single Product Matching":
-        product_matching_page()
-    elif page == "File Product Matching":
-        file_product_matching_page()
-
-if __name__ == "__main__":
-    main()
+if selected == 'Single product matching':
+    product_matching_page()
+if selected == 'File product matching':
+    file_product_matching_page()
