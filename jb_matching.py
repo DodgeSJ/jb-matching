@@ -234,56 +234,23 @@ def file_product_matching_page():
             st.error("Invalid file format. Please upload a CSV or Excel file.")
             return
 
-        # Create an empty dataframe to store the expanded rows
-        expanded_df = pd.DataFrame()
+        # Option 1: Auto-Select Highest Matching Score
+        auto_select = st.checkbox("Auto-Select Highest Matching Score")
 
-        # Perform product name matching for each row in the dataframe
-        for _, row in df.iterrows():
-            product_name = row['product_name']
-            suggestions = name_pred(product_name)[1] or ['']  # Get matching suggestions or empty list
+        if auto_select:
+            df['top_suggestion'] = df['product_name'].apply(lambda product_name: name_pred(product_name)[1][0] if name_pred(product_name)[1] else '')
 
-            # Create a new row for each matching suggestion
-            for suggestion in suggestions:
-                new_row = {
-                    'product_name': product_name,
-                    'top_suggestion': suggestion
-                }
-                expanded_df = pd.concat([expanded_df, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+            # Split 'Top Suggestion' column into 'Product Code', 'Product Name', and 'Matching Score'
+            df[['product_code', 'matching_name', 'matching_score']] = df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
 
-        expanded_df[['product_code', 'matching_name', 'matching_score']] = expanded_df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
-
-        # Display the output dataframe with selected columns
-        st.write("Output Dataframe:")
-        new_df = expanded_df[['product_name', 'product_code', 'matching_name', 'matching_score']]
-        
-        new_df['Select'] = False
-
-        # Define the checkbox column configuration
-        checkbox_column = st.column_config.CheckboxColumn("Selection")
-
-        # Configure the column_config dictionary
-        column_config = {
-            "Select": checkbox_column
-        }
-
-        # Display the data editor with the checkbox column configuration
-        edited_data_df = st.data_editor(new_df, column_config=column_config, disabled=['product_name', 'product_code', 'matching_name', 'matching_score'])
-
-        # Create a submit button
-        if st.button("Submit"):
-            # Filter dataframe based on selected rows
-            selected_rows = edited_data_df[edited_data_df["Select"]]
-
-            # Remove the "favorite" column from the selected rows
-            selected_rows = selected_rows.drop("Select", axis=1)
-
-            # Show the selected rows
-            st.write('Final Dataframe:')
-            st.dataframe(selected_rows)
+            # Display the output dataframe with selected columns
+            st.write("Output Dataframe:")
+            output_df = df[['product_name', 'product_code', 'matching_name', 'matching_score']]
+            st.dataframe(output_df)
 
             # Save the DataFrame as a CSV file
             output_buffer = io.BytesIO()
-            selected_rows.to_csv(output_buffer, index=False, encoding='utf-8-sig')
+            output_df.to_csv(output_buffer, index=False, encoding='utf-8-sig')
             output_buffer.seek(0)
 
             # Display the download link for the CSV file
@@ -293,6 +260,70 @@ def file_product_matching_page():
                 file_name="output.csv",
                 mime="text/csv"
             )
+
+        # Option 2: Manual Selection
+        manual_select = st.checkbox("Manual Selection")
+
+        if manual_select:
+            expanded_df = pd.DataFrame()
+
+            # Perform product name matching for each row in the dataframe
+            for _, row in df.iterrows():
+                product_name = row['product_name']
+                suggestions = name_pred(product_name)[1] or ['']  # Get matching suggestions or empty list
+
+                # Create a new row for each matching suggestion
+                for suggestion in suggestions:
+                    new_row = {
+                        'product_name': product_name,
+                        'top_suggestion': suggestion
+                    }
+                    expanded_df = pd.concat([expanded_df, pd.DataFrame(new_row, index=[0])], ignore_index=True)
+
+            expanded_df[['product_code', 'matching_name', 'matching_score']] = expanded_df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
+            new_df = expanded_df[['product_name', 'product_code', 'matching_name', 'matching_score']]
+
+            # Display the output dataframe with selected columns
+            st.write("Output Dataframe:")
+            new_df = expanded_df[['product_name', 'product_code', 'matching_name', 'matching_score']]
+            
+            new_df['Select'] = False
+
+            # Define the checkbox column configuration
+            checkbox_column = st.column_config.CheckboxColumn("Selection")
+
+            # Configure the column_config dictionary
+            column_config = {
+                "Select": checkbox_column
+            }
+
+            # Display the data editor with the checkbox column configuration
+            edited_data_df = st.data_editor(new_df, column_config=column_config, disabled=['product_name', 'product_code', 'matching_name', 'matching_score'])
+
+            # Create a submit button
+            if st.button("Submit"):
+                # Filter dataframe based on selected rows
+                selected_rows = edited_data_df[edited_data_df["Select"]]
+
+                # Remove the "favorite" column from the selected rows
+                output_df = selected_rows.drop("Select", axis=1)
+
+                # Show the selected rows
+                st.write('Final Dataframe:')
+                st.dataframe(output_df)
+        
+                # Save the DataFrame as a CSV file
+                output_buffer = io.BytesIO()
+                output_df.to_csv(output_buffer, index=False, encoding='utf-8-sig')
+                output_buffer.seek(0)
+
+                # Display the download link for the CSV file
+                st.download_button(
+                    label="Download Output CSV",
+                    data=output_buffer,
+                    file_name="output.csv",
+                    mime="text/csv"
+                )
 
 # Main function to run the app
 def main():
