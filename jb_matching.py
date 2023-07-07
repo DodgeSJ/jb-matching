@@ -3,6 +3,7 @@ import boto3
 import io
 import os
 import re
+import clipboard
 import pandas as pd
 from pythainlp.util import normalize
 from pythainlp.tokenize import word_tokenize
@@ -207,16 +208,36 @@ def name_pred(txt):
 
 # Page for single product matching
 def product_matching_page():
+
+    # Clear session state if clear cache button is clicked
+    if st.button("Clear Cache"):
+        st.session_state.clear()
+
     st.title("Product Matching")
     product_name = st.text_input("Enter the product name")
 
     if st.button("Match"):
         matched_product = name_pred(product_name)
+        st.session_state.matched_product = matched_product
+
+    if "matched_product" in st.session_state:
+        matched_product = st.session_state.matched_product
 
         st.write('Status:', matched_product[0])
         st.write('Suggestions:')
         for suggestion in matched_product[1]:
-            st.write('- ' + suggestion)
+            col1, col2 = st.columns([9, 1])
+            col1.write('- ' + suggestion)
+            with col2:
+                button_id = suggestion.replace(" ", "_")
+                st.button(label='Copy', key=button_id, on_click=copy_text_to_clipboard, args=(suggestion,))
+
+def copy_text_to_clipboard(text):
+    pattern = r'product code:\s*(\w+)'
+    matches = re.findall(pattern, text)
+    if matches:
+        code = matches[0]
+        clipboard.copy(code)
 
 # Page for file product matching
 def file_product_matching_page():
@@ -224,12 +245,12 @@ def file_product_matching_page():
     file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
 
     if file is not None:
-        file_extension = os.path.splitext(file.name)[1]  # Get the file extension
+        file_extension = os.path.splitext(file.name)[1]
 
         if file_extension == ".csv":
-            df = pd.read_csv(file)  # Read CSV file
+            df = pd.read_csv(file)
         elif file_extension == ".xlsx":
-            df = pd.read_excel(file)  # Read Excel file
+            df = pd.read_excel(file)
         else:
             st.error("Invalid file format. Please upload a CSV or Excel file.")
             return
@@ -238,22 +259,17 @@ def file_product_matching_page():
         auto_select = st.checkbox("Auto-Select Highest Matching Score")
 
         if auto_select:
-            df['top_suggestion'] = df['product_name'].apply(lambda product_name: name_pred(product_name)[1][0] if name_pred(product_name)[1] else '')
+            df['top_suggestion'] = df['input_name'].apply(lambda input_name: name_pred(input_name)[1][0] if name_pred(input_name)[1] else '')
+            df[['product_code', 'product_name', 'matching_score']] = df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
 
-            # Split 'Top Suggestion' column into 'Product Code', 'Product Name', and 'Matching Score'
-            df[['product_code', 'matching_name', 'matching_score']] = df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
-
-            # Display the output dataframe with selected columns
             st.write("Output Dataframe:")
-            output_df = df[['product_name', 'product_code', 'matching_name', 'matching_score']]
+            output_df = df[['input_name', 'product_code', 'product_name', 'matching_score']]
             st.dataframe(output_df)
 
-            # Save the DataFrame as a CSV file
             output_buffer = io.BytesIO()
             output_df.to_csv(output_buffer, index=False, encoding='utf-8-sig')
             output_buffer.seek(0)
 
-            # Display the download link for the CSV file
             st.download_button(
                 label="Download Output CSV",
                 data=output_buffer,
@@ -267,57 +283,42 @@ def file_product_matching_page():
         if manual_select:
             expanded_df = pd.DataFrame()
 
-            # Perform product name matching for each row in the dataframe
             for _, row in df.iterrows():
-                product_name = row['product_name']
-                suggestions = name_pred(product_name)[1] or ['']  # Get matching suggestions or empty list
+                input_name = row['input_name']
+                suggestions = name_pred(input_name)[1] or ['']
 
-                # Create a new row for each matching suggestion
                 for suggestion in suggestions:
                     new_row = {
-                        'product_name': product_name,
+                        'input_name': input_name,
                         'top_suggestion': suggestion
                     }
                     expanded_df = pd.concat([expanded_df, pd.DataFrame(new_row, index=[0])], ignore_index=True)
 
-            expanded_df[['product_code', 'matching_name', 'matching_score']] = expanded_df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
-            new_df = expanded_df[['product_name', 'product_code', 'matching_name', 'matching_score']]
+            expanded_df[['product_code', 'product_name', 'matching_score']] = expanded_df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
+            new_df = expanded_df[['input_name', 'product_code', 'product_name', 'matching_score']]
 
-            # Display the output dataframe with selected columns
             st.write("Output Dataframe:")
-            new_df = expanded_df[['product_name', 'product_code', 'matching_name', 'matching_score']]
-            
+            new_df = expanded_df[['input_name', 'product_code', 'product_name', 'matching_score']]
             new_df['Select'] = False
 
-            # Define the checkbox column configuration
             checkbox_column = st.column_config.CheckboxColumn("Selection")
-
-            # Configure the column_config dictionary
             column_config = {
                 "Select": checkbox_column
             }
 
-            # Display the data editor with the checkbox column configuration
-            edited_data_df = st.data_editor(new_df, column_config=column_config, disabled=['product_name', 'product_code', 'matching_name', 'matching_score'])
+            edited_data_df = st.data_editor(new_df, column_config=column_config, disabled=['input_name', 'product_code', 'product_name', 'matching_score'])
 
-            # Create a submit button
             if st.button("Submit"):
-                # Filter dataframe based on selected rows
                 selected_rows = edited_data_df[edited_data_df["Select"]]
-
-                # Remove the "favorite" column from the selected rows
                 output_df = selected_rows.drop("Select", axis=1)
 
-                # Show the selected rows
                 st.write('Final Dataframe:')
                 st.dataframe(output_df)
         
-                # Save the DataFrame as a CSV file
                 output_buffer = io.BytesIO()
                 output_df.to_csv(output_buffer, index=False, encoding='utf-8-sig')
                 output_buffer.seek(0)
 
-                # Display the download link for the CSV file
                 st.download_button(
                     label="Download Output CSV",
                     data=output_buffer,
