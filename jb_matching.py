@@ -207,9 +207,7 @@ def name_pred(txt):
         
     return status, suggestion
 
-# Page for single product matching
 def product_matching_page():
-
     st.title("Product Matching")
     product_name = st.text_input("Enter the product name")
 
@@ -217,7 +215,6 @@ def product_matching_page():
         matched_product = name_pred(product_name)
         st.session_state.matched_product = matched_product
 
-    # Clear session state if clear cache button is clicked
     if st.button("Clear"):
         st.session_state.clear()
 
@@ -249,13 +246,15 @@ def file_product_matching_page():
         file_extension = os.path.splitext(file.name)[1]
 
         if file_extension == ".csv":
-            df = pd.read_csv(file)
+            input_df = pd.read_csv(file)
         elif file_extension == ".xlsx":
-            df = pd.read_excel(file)
+            input_df = pd.read_excel(file)
         else:
             st.error("Invalid file format. Please upload a CSV or Excel file.")
             return
 
+        df = input_df.copy()
+        
         # Option 1: Auto-Select Highest Matching Score
         auto_select = st.checkbox("Auto-Select Highest Matching Score")
 
@@ -297,9 +296,6 @@ def file_product_matching_page():
 
             expanded_df[['product_code', 'product_name', 'matching_score']] = expanded_df['top_suggestion'].str.extract(r'product code: (\w+)\n\nproduct name: ([^\n]+)\n\nmatching score: (\d+)', flags=re.IGNORECASE)
             new_df = expanded_df[['input_name', 'product_code', 'product_name', 'matching_score']]
-
-            st.write("Output Dataframe:")
-            new_df = expanded_df[['input_name', 'product_code', 'product_name', 'matching_score']]
             new_df['Select'] = False
 
             checkbox_column = st.column_config.CheckboxColumn("Selection")
@@ -313,11 +309,15 @@ def file_product_matching_page():
                 selected_rows = edited_data_df[edited_data_df["Select"]]
                 output_df = selected_rows.drop("Select", axis=1)
 
+                merged_df = pd.merge(input_df, selected_rows, on="input_name", how="left")
+                merged_df.fillna('', inplace=True)
+                merged_df.drop(columns=['Select'], inplace=True) 
+                
                 st.write('Final Dataframe:')
-                st.dataframe(output_df)
+                st.dataframe(merged_df)
         
                 output_buffer = io.BytesIO()
-                output_df.to_csv(output_buffer, index=False, encoding='utf-8-sig')
+                merged_df.to_csv(output_buffer, index=False, encoding='utf-8-sig')
                 output_buffer.seek(0)
 
                 st.download_button(
