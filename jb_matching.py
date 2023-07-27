@@ -101,6 +101,8 @@ def keyword_search(product_cut):
     return keyword
 
 def clean_msg(msg):
+    msg = str(msg)
+    msg = re.sub(r'\n', ' ', msg)
     msg = re.sub(r'#','',msg)
     msg = ' '.join(msg.split())
     msg = normalize(msg)
