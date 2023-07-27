@@ -11,7 +11,7 @@ from pythainlp.tokenize import word_tokenize
 from pythainlp.corpus.common import thai_words
 from pythainlp.util import Trie
 from googletrans import Translator
-from fuzzywuzzy import fuzz
+from thefuzz import fuzz
 
 s3 = boto3.client('s3')
 bucket_name = 'jb-matching-storage'
@@ -78,6 +78,7 @@ def cut_msg(txt):
             adj.append(n)
         elif len(re.findall('\.', n)) !=0 :
             model.remove(n)
+            name_list.append(n)
             
     return name_list, model, adj
 
